@@ -9,13 +9,13 @@ import sbt.*
 import sbt.internal.sbtscalafix.JLineAccess
 import sbt.internal.util.complete.Parser
 import sbt.plugins.JvmPlugin
+import sbt.librarymanagement.ResolveException
 import scalafix.interfaces.{ScalafixError, ScalafixMainCallback}
 import scalafix.internal.sbt.*
 
+import scala.annotation.nowarn
 import scala.collection.JavaConverters.collectionAsScalaIterableConverter
 import scala.util.control.NoStackTrace
-import sbt.librarymanagement.ResolveException
-
 import scala.util.Try
 
 object ScalafixPlugin extends AutoPlugin {
@@ -64,10 +64,15 @@ object ScalafixPlugin extends AutoPlugin {
         "Optional list of artifacts to resolve to run custom rules. " +
           "Can be set in ThisBuild or at project-level."
       )
+    @deprecated(
+      "scalafixScalaBinaryVersion now follows scalaBinaryVersion by default",
+      "0.12.1"
+    )
     val scalafixScalaBinaryVersion: SettingKey[String] =
       settingKey[String](
-        "The Scala binary version used for scalafix execution. Can be set in ThisBuild or at project-level. " +
-          "Custom rules must be compiled against that binary version. Defaults to 2.12."
+        "The Scala binary version used for scalafix execution. Must be set at project-level. " +
+          "Custom rules must be compiled against that binary version. Defaults to 2.12 for 2.12 projects, " +
+          "2.13 otherwise."
       )
     val scalafixConfig: SettingKey[Option[File]] =
       settingKey[Option[File]](
@@ -155,7 +160,7 @@ object ScalafixPlugin extends AutoPlugin {
         loadedRules = { () =>
           val scalafixInterface = ScalafixInterface(
             scalafixInterfaceCache.value,
-            scalafixScalaBinaryVersion.value,
+            scalafixScalaBinaryVersion.value: @nowarn,
             toolClasspath = Arg.ToolClasspath(
               // Local rules classpath must be looked up via tasks so they can't appear in completions
               Nil,
@@ -266,6 +271,13 @@ object ScalafixPlugin extends AutoPlugin {
   )
 
   override lazy val globalSettings: Seq[Def.Setting[_]] = Seq(
+    // use derive to support per-level values while allowing user to override at ThisBuild level
+    Def.derive((scalafixScalaBinaryVersion: @nowarn) := {
+      scalaBinaryVersion.value match {
+        case "2.12" => "2.12"
+        case _ => "2.13"
+      }
+    }),
     scalafixCallback := new ScalafixLogger(ScalafixInterface.defaultLogger),
     scalafixConfig := None, // let scalafix-cli try to infer $CWD/.scalafix.conf
     scalafixOnCompile := false,
@@ -300,7 +312,6 @@ object ScalafixPlugin extends AutoPlugin {
           )
         }
       },
-      scalafixScalaBinaryVersion := "2.12",
       scalafixJGitCompletion := new JGitCompletion(baseDirectory.value.toPath)
     )
 
@@ -433,7 +444,7 @@ object ScalafixPlugin extends AutoPlugin {
         shellArgs,
         projectDepsExternal,
         projectDepsInternal,
-        scalafixScalaBinaryVersion.value,
+        scalafixScalaBinaryVersion.value: @nowarn,
         scalafixDependencies.value,
         allResolvers,
         (ThisBuild / scalafixCallback).value,
