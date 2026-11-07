@@ -24,6 +24,7 @@ lazy val rules = projectMatrix
   .jvmPlatform(rulesCrossVersions)
 
 lazy val input = projectMatrix
+  .settings(Compile / semanticdbTargetRoot := (Compile / classDirectory).value)
   .defaultAxes(VirtualAxis.jvm)
   .jvmPlatform(scalaVersions = Seq(scala3Version))
   .jvmPlatform(
