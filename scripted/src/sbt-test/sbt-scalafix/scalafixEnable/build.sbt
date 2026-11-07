@@ -2,7 +2,9 @@ val V = _root_.scalafix.sbt.BuildInfo
 
 lazy val config = project.settings(
   scalafixScalaBinaryVersion := scalaBinaryVersion.value, // to support old scalafix-interface
-  scalaVersion := "2.13.18"
+  scalaVersion := "2.13.18",
+  // scalafixAll validates RemoveUnused against project-level compiler options.
+  scalacOptions += "-Ywarn-unused"
 )
 
 lazy val unsupported = project.settings(
